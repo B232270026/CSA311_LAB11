@@ -13,16 +13,17 @@ class QuizCore {
   private questions: QuizQuestion[];
   private currentQuestionIndex: number;
   private score: number;
+  private userAnswers: (string | null)[];
 
   /**
    * Constructor
-   * @param filePath - The file path to a JSON file containing quiz data.
-   * @param callback - A callback function called when the quiz data is loaded.
    */
   constructor() {
     this.questions = quizData;
     this.currentQuestionIndex = 0;
     this.score = 0;
+    // Initialize user answers array with null values for each question
+    this.userAnswers = new Array(this.questions.length).fill(null);
   }
 
   /**
@@ -38,10 +39,29 @@ class QuizCore {
   }
 
   /**
+   * Get the current question index.
+   * @returns The current question index.
+   */
+  public getCurrentQuestionIndex(): number {
+    return this.currentQuestionIndex;
+  }
+
+  /**
    * Move to the next question.
    */
   public nextQuestion(): void {      
-    this.currentQuestionIndex++;
+    if (this.currentQuestionIndex < this.questions.length - 1) {
+      this.currentQuestionIndex++;
+    }
+  }
+
+  /**
+   * Move to the previous question.
+   */
+  public previousQuestion(): void {
+    if (this.currentQuestionIndex > 0) {
+      this.currentQuestionIndex--;
+    }
   }
 
   /**
@@ -54,15 +74,41 @@ class QuizCore {
   }
 
   /**
+   * Checks if there is a previous question available in the quiz.
+   *
+   * @returns {boolean} True if there is a previous question, false if this is the first question.
+   */
+  public hasPreviousQuestion(): boolean {
+    return this.currentQuestionIndex > 0;
+  }
+
+  /**
    * Record the user's answer and update the score.
    * @param answer - The user's answer.
+   * @returns {boolean} Whether the answer was correct
    */
-  public answerQuestion(answer: string): void {
+  public answerQuestion(answer: string): boolean {
+    // Store the user's answer
+    this.userAnswers[this.currentQuestionIndex] = answer;
+    
     // Records the user's answer and updates the score if the answer is correct.
     const currentQuestion = this.getCurrentQuestion();
     if (currentQuestion && answer === currentQuestion.correctAnswer) {
-      this.score++;
+      // Only increment score if this is a new correct answer
+      if (this.userAnswers[this.currentQuestionIndex] !== currentQuestion.correctAnswer) {
+        this.score++;
+      }
+      return true;
     }
+    return false;
+  }
+
+  /**
+   * Get the user's answer for the current question.
+   * @returns The user's answer or null if none.
+   */
+  public getCurrentAnswer(): string | null {
+    return this.userAnswers[this.currentQuestionIndex];
   }
 
   /**
@@ -79,6 +125,15 @@ class QuizCore {
    */
   public getTotalQuestions(): number {
     return this.questions.length;
+  }
+
+  /**
+   * Reset the quiz.
+   */
+  public resetQuiz(): void {
+    this.currentQuestionIndex = 0;
+    this.score = 0;
+    this.userAnswers = new Array(this.questions.length).fill(null);
   }
 }
 

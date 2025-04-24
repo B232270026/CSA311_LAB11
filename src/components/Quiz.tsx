@@ -1,72 +1,206 @@
-import React, { useState } from 'react'
-import './Quiz.css'
+import React, { useState, useEffect } from 'react';
+import './Quiz.css';
+import QuizCore from '../core/QuizCore';
 import QuizQuestion from '../core/QuizQuestion';
 
-interface QuizState {
-  questions: QuizQuestion[]
-  currentQuestionIndex: number
-  selectedAnswer: string | null
-  score: number
-}
-
+// function component
 const Quiz: React.FC = () => {
-  const initialQuestions: QuizQuestion[] = [
-    {
-      question: 'What is the capital of France?',
-      options: ['London', 'Berlin', 'Paris', 'Madrid'],
-      correctAnswer: 'Paris',
-    },
-  ];
-  const [state, setState] = useState<QuizState>({
-    questions: initialQuestions,
-    currentQuestionIndex: 0,  // Initialize the current question index.
-    selectedAnswer: null,  // Initialize the selected answer.
-    score: 0,  // Initialize the score.
-  });
+  // Create an instance of QuizCore to manage the logic
+  const [quizCore] = useState(new QuizCore());// buh logiciig udirdana
+  
+ 
+  const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(quizCore.getCurrentQuestion());
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [score, setScore] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<(string | null)[]>(Array(quizCore.getTotalQuestions()).fill(null));
+  const [correctAnswers, setCorrectAnswers] = useState<boolean[]>(Array(quizCore.getTotalQuestions()).fill(false));
+  
+
+  const [questionBank, setQuestionBank] = useState<QuizQuestion[]>([currentQuestion].filter(Boolean) as QuizQuestion[]);
+
 
   const handleOptionSelect = (option: string): void => {
-    setState((prevState) => ({ ...prevState, selectedAnswer: option }));
+    setSelectedAnswer(option);
+    
+
+    const updatedAnswers = [...userAnswers];
+    updatedAnswers[quizCore.getCurrentQuestionIndex()] = option;
+    setUserAnswers(updatedAnswers);
+    
+
+    const isCorrect = option === currentQuestion?.correctAnswer;
+    const updatedCorrectAnswers = [...correctAnswers];
+    updatedCorrectAnswers[quizCore.getCurrentQuestionIndex()] = isCorrect;
+    setCorrectAnswers(updatedCorrectAnswers);
   }
 
 
-  const handleButtonClick = (): void => {
-    // Task3: Implement the logic for button click, such as moving to the next question.
-  } 
+  const handleNextQuestion = (): void => {
+    if (quizCore.hasNextQuestion()) {
 
-  const { questions, currentQuestionIndex, selectedAnswer, score } = state;
-  const currentQuestion = questions[currentQuestionIndex];
+      if (selectedAnswer) {
+        quizCore.answerQuestion(selectedAnswer);
+      }
+      
+      quizCore.nextQuestion();
+      const nextQuestion = quizCore.getCurrentQuestion();
+      setCurrentQuestion(nextQuestion);
+      
+      if (nextQuestion && !questionBank.some(q => q.question === nextQuestion.question)) {
+        setQuestionBank([...questionBank, nextQuestion]);
+      }
+      
 
-  if (!currentQuestion) {
+      setSelectedAnswer(userAnswers[quizCore.getCurrentQuestionIndex()] || null);
+    }
+  }
+
+
+  const handlePreviousQuestion = (): void => {
+    if (quizCore.hasPreviousQuestion()) {
+      quizCore.previousQuestion();
+      const prevQuestion = quizCore.getCurrentQuestion();
+      setCurrentQuestion(prevQuestion);
+ 
+      setSelectedAnswer(userAnswers[quizCore.getCurrentQuestionIndex()] || null);
+    }
+  }
+
+
+  const handleFinishQuiz = (): void => {
+
+    if (selectedAnswer) {
+      quizCore.answerQuestion(selectedAnswer);
+    }
+    
+
+    const finalScore = correctAnswers.filter(isCorrect => isCorrect).length;
+    setScore(finalScore);
+    setQuizCompleted(true);
+  }
+
+
+  const handleTryAgain = (): void => {
+
+    quizCore.resetQuiz();
+    const firstQuestion = quizCore.getCurrentQuestion();
+    setCurrentQuestion(firstQuestion);
+    setSelectedAnswer(null);
+    setQuizCompleted(false);
+    setScore(0);
+    setUserAnswers(Array(quizCore.getTotalQuestions()).fill(null));
+    setCorrectAnswers(Array(quizCore.getTotalQuestions()).fill(false));
+    setQuestionBank([firstQuestion].filter(Boolean) as QuizQuestion[]);
+  }
+
+
+  if (quizCompleted) {
     return (
-      <div>
-        <h2>Quiz Completed</h2>
-        <p>Final Score: {score} out of {questions.length}</p>
+      <div className="quiz-container result-container">
+        <h2>Quiz Completed!</h2>
+        <p className="final-score">Your Final Score: {score} out of {quizCore.getTotalQuestions()}</p>
+        <p className="score-percentage">
+          {Math.round((score / quizCore.getTotalQuestions()) * 100)}% Correct
+        </p>
+        
+        <div className="statistics">
+          <h3>Question Statistics:</h3>
+          {questionBank.map((question, index) => (
+            <div key={index} className={`stat-item ${correctAnswers[index] ? 'correct-answer' : 'incorrect-answer'}`}>
+              <p className="stat-question"><strong>Q{index + 1}:</strong> {question.question}</p>
+              <p>Your answer: <span className={correctAnswers[index] ? 'correct' : 'incorrect'}>
+                {userAnswers[index] || 'Not answered'}
+              </span></p>
+              {!correctAnswers[index] && <p>Correct answer: <span className="correct">{question.correctAnswer}</span></p>}
+            </div>
+          ))}
+        </div>
+        
+        <button onClick={handleTryAgain} className="try-again-btn">
+          Try Again
+        </button>
       </div>
     );
   }
 
+
+  if (!currentQuestion) {
+    return <div className="quiz-container">Loading questions...</div>;
+  }
+
+
+  const isFirstQuestion = quizCore.getCurrentQuestionIndex() === 0;
+  const isLastQuestion = quizCore.getCurrentQuestionIndex() === quizCore.getTotalQuestions() - 1;
+  
+
+  const progressPercentage = ((quizCore.getCurrentQuestionIndex()) / quizCore.getTotalQuestions()) * 100;
+
   return (
-    <div>
-      <h2>Quiz Question:</h2>
-      <p>{currentQuestion.question}</p>
+    <div className="quiz-container">
+      <div className="progress-bar">
+        <div 
+          className="progress" 
+          style={{ width: `${progressPercentage}%` }}
+        ></div>
+      </div>
+      
+      <h2>Question {quizCore.getCurrentQuestionIndex() + 1} of {quizCore.getTotalQuestions()}</h2>
+      <p className="question">{currentQuestion.question}</p>
     
-      <h3>Answer Options:</h3>
-      <ul>
-        {currentQuestion.options.map((option) => (
-          <li
-            key={option}
-            onClick={() => handleOptionSelect(option)}
-            className={selectedAnswer === option ? 'selected' : ''}
-          >
-            {option}
-          </li>
-        ))}
+      <h3>Options:</h3>
+      <ul className="options-list">
+        {currentQuestion.options.map((option) => {
+          let className = "option-item";
+          
+          // Apply styling based on selection only
+          if (selectedAnswer === option) {
+            className += " selected";
+          }
+          
+          return (
+            <li
+              key={option}
+              onClick={() => handleOptionSelect(option)}
+              className={className}
+            >
+              {option}
+            </li>
+          );
+        })}
       </ul>
 
-      <h3>Selected Answer:</h3>
-      <p>{selectedAnswer ?? 'No answer selected'}</p>
 
-      <button onClick={handleButtonClick}>Next Question</button>
+      <div className="button-container">
+        {!isFirstQuestion && (
+          <button 
+            onClick={handlePreviousQuestion}
+            className="back-btn"
+          >
+            Back
+          </button>
+        )}
+        
+     
+        {!isLastQuestion ? (
+          <button 
+            onClick={handleNextQuestion}
+            className="next-btn"
+            disabled={!selectedAnswer}
+          >
+            Next
+          </button>
+        ) : (
+         
+          <button 
+            onClick={handleFinishQuiz}
+            className="finish-btn"
+            disabled={!selectedAnswer}
+          >
+            Finish Quiz
+          </button>
+        )}
+      </div>
     </div>
   );
 };
